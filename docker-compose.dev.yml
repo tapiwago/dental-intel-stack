@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: dental-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: dental_db_dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_dev_data:/data/db
+      - ./backend/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - dental-dev-network
+
+  # Backend API (Development)
+  dental-api-dev:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: dental-api-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/dental_db_dev
+      - DB_NAME=dental_db_dev
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    networks:
+      - dental-dev-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/logs:/app/logs
+    command: npm run dev
+
+  # Frontend (Development)
+  dental-frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: dental-frontend-dev
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - dental-api-dev
+    networks:
+      - dental-dev-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: dental-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - dental-dev-network
+
+volumes:
+  mongodb_dev_data:
+
+networks:
+  dental-dev-network:
+    driver: bridge
